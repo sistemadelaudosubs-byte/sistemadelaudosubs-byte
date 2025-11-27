@@ -1,0 +1,5 @@
+{
+  "name": "LibrasMed AI",
+  "description": "Assistente de IA para tradução de prescrições médicas e orientações de saúde para Libras (Glossa e Vídeo) com exportação para PDF.",
+  "requestFramePermissions": []
+}
