@@ -79,3 +79,29 @@ export const generateIllustration = async (instruction: string): Promise<string 
     return null;
   }
 };
+
+export const generateSymptomIllustration = async (symptomName: string, description: string): Promise<string | null> => {
+  const ai = getAIClient();
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { 
+            text: `Crie uma ilustração didática e clara de um sinal de LIBRAS (Língua Brasileira de Sinais) para o sintoma: "${symptomName}". O movimento é descrito como: "${description}". Use um estilo de desenho vetorial plano (flat vector), fundo branco, com setas indicando o movimento se necessário. Foco na clareza do gesto.` 
+          }
+        ],
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData && part.inlineData.data) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error(`Failed to generate symptom image for ${symptomName}:`, e);
+    return null;
+  }
+};
