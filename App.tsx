@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { translateToLibras, generateIllustration, generateSymptomIllustration } from './services/geminiService';
 import { LoadingState, TranslationResult } from './types';
-import { FileText, Wand2, Download, AlertCircle, Loader2, HeartHandshake, Image as ImageIcon, MessageCircle, Activity, CheckSquare, RefreshCw, AlertTriangle } from 'lucide-react';
+import { FileText, Wand2, Download, AlertCircle, Loader2, HeartHandshake, Image as ImageIcon, MessageCircle, Activity, CheckSquare, RefreshCw, AlertTriangle, Settings } from 'lucide-react';
 import { jsPDF } from "jspdf";
 
 // --- DADOS DOS SINTOMAS (Configuração) ---
@@ -129,6 +129,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<LoadingState>(LoadingState.IDLE);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [missingKeyError, setMissingKeyError] = useState<boolean>(false);
   
   // State for Checklist
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -149,8 +150,11 @@ const App: React.FC = () => {
       if (base64Image) {
         setSymptomImages(prev => ({ ...prev, [symptomId]: base64Image }));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao gerar imagem do sintoma:", err);
+      if (err.message === "API_KEY_MISSING") {
+        setMissingKeyError(true);
+      }
     } finally {
       setLoadingSymptoms(prev => ({ ...prev, [symptomId]: false }));
     }
@@ -175,6 +179,7 @@ const App: React.FC = () => {
     setStatus(LoadingState.TRANSLATING_TEXT);
     setErrorMsg(null);
     setResult(null);
+    setMissingKeyError(false);
 
     try {
       // 1. Translate Text to Gloss
@@ -196,8 +201,13 @@ const App: React.FC = () => {
 
     } catch (error: any) {
       console.error(error);
-      setErrorMsg(error.message || "Ocorreu um erro desconhecido.");
-      setStatus(LoadingState.ERROR);
+      if (error.message === "API_KEY_MISSING") {
+        setMissingKeyError(true);
+        setStatus(LoadingState.IDLE); // Reset status so it doesn't show generic error
+      } else {
+        setErrorMsg(error.message || "Ocorreu um erro desconhecido.");
+        setStatus(LoadingState.ERROR);
+      }
     }
   };
 
@@ -389,6 +399,29 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-gray-800 flex flex-col">
       <Header />
       
+      {/* Alert for missing API Key */}
+      {missingKeyError && (
+        <div className="max-w-7xl mx-auto px-4 mt-6 w-full">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm flex items-start gap-3">
+             <div className="bg-red-100 p-2 rounded-full">
+               <Settings className="w-5 h-5 text-red-600" />
+             </div>
+             <div>
+               <h3 className="text-red-800 font-bold">Configuração Necessária (API Key Ausente)</h3>
+               <p className="text-red-700 text-sm mt-1">
+                 O sistema não encontrou a chave do Gemini. Se você está no <strong>Netlify</strong>:
+               </p>
+               <ol className="list-decimal list-inside text-red-700 text-sm mt-2 space-y-1 ml-1">
+                 <li>Vá em <strong>Site configuration</strong> {'>'} <strong>Environment variables</strong>.</li>
+                 <li>Adicione uma variável com Key: <code className="bg-red-100 px-1 rounded">API_KEY</code></li>
+                 <li>Cole sua chave que começa com <code className="bg-red-100 px-1 rounded">AIza...</code> no Value.</li>
+                 <li>Vá em <strong>Deploys</strong> e faça um novo deploy.</li>
+               </ol>
+             </div>
+          </div>
+        </div>
+      )}
+      
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
@@ -517,7 +550,7 @@ const App: React.FC = () => {
                                     alt={`Sinal de ${symptom.label}`}
                                     className="w-full h-full object-cover"
                                   />
-                                  {!hasImage && (
+                                  {!hasImage && !missingKeyError && (
                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button 
                                         onClick={() => generateSymptomImageIfNeeded(symptom.id)}
